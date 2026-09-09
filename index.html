@@ -31,7 +31,7 @@
   </div>
 
   <button id="genBtn" onclick="generatePoster()" disabled>生成喜茶风海报</button>
-  <div class="loading" id="loadingText">🎨 正在抠图与叠加涂鸦中，约需 10 秒...</div>
+  <div class="loading" id="loadingText">🎨 正在抠图与绘制手绘小人，约需 15 秒...</div>
 
   <div class="preview-box" id="resultContainer" style="display: none;">
     <h3>生成效果：</h3>
@@ -41,16 +41,43 @@
 
 <script>
   let selectedBase64 = '';
-  let selectedMime = '';
+  let selectedMime = 'image/jpeg';
 
   function handleFile(file) {
     if (!file) return;
+    document.getElementById('uploadText').innerText = `已选择: ${file.name} (压缩处理中...)`;
+    
+    // 自动压缩图片，防止超过 Vercel 限制
+    const img = new Image();
     const reader = new FileReader();
     reader.onload = function(e) {
-      selectedBase64 = e.target.result.split(',')[1];
-      selectedMime = file.type;
-      document.getElementById('uploadText').innerText = `已选择文件: ${file.name}`;
-      document.getElementById('genBtn').disabled = false;
+      img.src = e.target.result;
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 1024;
+        
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        selectedBase64 = compressedDataUrl.split(',')[1];
+        
+        document.getElementById('uploadText').innerText = `已就绪: ${file.name}`;
+        document.getElementById('genBtn').disabled = false;
+      };
     };
     reader.readAsDataURL(file);
   }
@@ -73,14 +100,14 @@
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         resultImg.src = data.imageUrl;
         resultBox.style.display = 'block';
       } else {
-        alert('生成失败: ' + data.error);
+        alert('生成失败: ' + (data.error || '服务器无响应'));
       }
     } catch (err) {
-      alert('网络错误，请重试');
+      alert('请求超时或网络问题，请刷新后再试一次');
     } finally {
       btn.disabled = false;
       loading.style.display = 'none';
