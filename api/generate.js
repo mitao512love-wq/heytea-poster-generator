@@ -17,10 +17,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: '请选择并上传图片' });
     }
 
-    // 初始化官方 SDK
     const genAI = new GoogleGenerativeAI(apiKey);
-    // 使用 SDK 推荐的标准模型名称
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    // 使用精准匹配的 gemini-1.5-flash-8b 模型名称，解决 404 问题
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-8b' });
 
     const prompt = `
 Analyze the uploaded image. Design a premium, high-end HeyTea (喜茶) editorial advertising poster as a complete valid SVG string.
@@ -39,11 +38,9 @@ Design Requirements:
       }
     };
 
-    // 发送生成请求
     const result = await model.generateContent([prompt, imagePart]);
     const responseText = result.response.text();
 
-    // 匹配 SVG 内容
     const svgMatch = responseText.match(/<svg[\s\S]*?<\/svg>/i);
     if (!svgMatch) {
       return res.status(500).json({ error: '海报生成格式解析失败，请重新点击生成' });
