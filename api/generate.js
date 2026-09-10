@@ -30,7 +30,7 @@ Design Requirements:
 7. Color Palette: Cream background (#FAF9F6), soft dark lines (#1C1C1C), elegant muted accent colors.
 `;
 
-    // 使用 Node.js 原生 fetch 调用 Gemini 1.5 Flash 接口，无需任何第三方 npm 包
+    // 使用 Node.js 原生 fetch 调用 Gemini 2.0 接口，无需任何第三方 npm 包
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
