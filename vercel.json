@@ -1,7 +1,8 @@
 {
   "functions": {
     "api/generate.js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "regions": ["iad1"]
     }
   }
 }
