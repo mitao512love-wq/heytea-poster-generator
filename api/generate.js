@@ -1,5 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -10,46 +8,74 @@ export default async function handler(req, res) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      return res.status(500).json({ error: '环境变量未配置 GEMINI_API_KEY' });
+      return res.status(500).json({ error: '未在 Vercel 配置 GEMINI_API_KEY 环境变量' });
     }
 
     if (!imageBase64) {
-      return res.status(400).json({ error: '请上传图片' });
+      return res.status(400).json({ error: '请选择并上传图片' });
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // 使用 Gemini 2.5 Flash 多模态模型
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-    // 喜茶风格的核心 Prompt
+    // 提示词：要求 Gemini 分析图片并输出喜茶风格的矢量海报 (SVG 格式)
     const prompt = `
-      Analyze the main product/object in this image. 
-      Generate a detailed textual image prompt describing a HeyTea style editorial poster based on it.
-      Requirements:
-      1. Minimal off-white cream background with generous negative space.
-      2. Cute black and white line-art doodle stick figures interacting with the main object (climbing a ladder, pushing a tiny wheelbarrow, spraying water, carrying ingredients).
-      3. High-end, clean, aesthetic design with modern poster composition.
-    `;
+Analyze the uploaded image. Design a premium, high-end HeyTea (喜茶) editorial advertising poster as a complete valid SVG string.
 
-    const imagePart = {
-      inlineData: {
-        data: imageBase64,
-        mimeType: mimeType || 'image/jpeg'
+Design Requirements:
+1. Output ONLY a valid <svg>...</svg> element, without markdown codeblock syntax, HTML wrap, or explanations.
+2. SVG dimensions: viewBox="0 0 600 800" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg".
+3. Background: Minimalist off-white cream background (#FAF9F6).
+4. Main Subject: In the center, draw a clean artistic vector graphic representation or framed showcase of the main item from the user's uploaded photo.
+5. Micro Line-Art Characters: Draw cute black & white stick-figure doodle characters interacting with the main item (e.g., climbing ladders, painting, pushing tiny wheelbarrows, resting on top).
+6. Editorial Typography:
+   - Include stylish minimal text layout: "灵感之茶", "HEYTEA", "INSPIRATION OF TEA", minimal border lines, and modern poster layout elements.
+7. Color Palette: Cream background (#FAF9F6), soft dark lines (#1C1C1C), elegant muted accent colors.
+`;
+
+    // 使用 Node.js 原生 fetch 调用 Gemini 2.0 接口，无需任何第三方 npm 包
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { inlineData: { mimeType: mimeType || 'image/jpeg', data: imageBase64 } },
+                { text: prompt }
+              ]
+            }
+          ]
+        })
       }
-    };
+    );
 
-    const result = await model.generateContent([prompt, imagePart]);
-    const responseText = result.response.text();
+    const data = await response.json();
 
-    return res.status(200).json({ 
-      success: true, 
-      message: '分析成功',
-      promptResult: responseText 
+    if (!response.ok) {
+      console.error('Gemini API Error:', data);
+      return res.status(500).json({ error: data.error?.message || 'Gemini API 请求失败' });
+    }
+
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    // 提取生成的 SVG 海报代码
+    const svgMatch = rawText.match(/<svg[\s\S]*?<\/svg>/i);
+    if (!svgMatch) {
+      return res.status(500).json({ error: '海报生成格式解析失败，请重新点击生成' });
+    }
+
+    const svgCode = svgMatch[0];
+    
+    // 将 SVG 转为可直接被 <img> 标签读取的 Data URL
+    const imageUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgCode)}`;
+
+    return res.status(200).json({
+      success: true,
+      imageUrl: imageUrl
     });
 
   } catch (error) {
-    console.error('API Error:', error);
-    return res.status(500).json({ error: error.message || '生成失败，请检查 API Key 或稍后重试' });
+    console.error('Server Error:', error);
+    return res.status(500).json({ error: error.message || '服务器内部错误，请重试' });
   }
 }
