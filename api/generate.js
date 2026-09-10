@@ -32,7 +32,7 @@ Design Requirements:
 
     // 使用 Node.js 原生 fetch 调用 Gemini 2.0 接口，无需任何第三方 npm 包
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
