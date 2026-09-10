@@ -25,9 +25,9 @@ Design Requirements:
 4. Draw a simple poster layout: main item graphic in center, clean stick-figure doodles climbing on it, and clean "HEYTEA 灵感之茶" text at the bottom. Keep SVG paths clean and simple.
 `;
 
-    // 重点修改：调用 gemini-1.5-flash-latest，确保 API 能正确识别模型
+    // 核心修改：使用具有明确版本的完整名称 gemini-1.5-flash-001
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
