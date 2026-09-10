@@ -19,7 +19,7 @@ export default async function handler(req, res) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     // 使用精准匹配的 gemini-1.5-flash-8b 模型名称，解决 404 问题
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-8b' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const prompt = `
 Analyze the uploaded image. Design a premium, high-end HeyTea (喜茶) editorial advertising poster as a complete valid SVG string.
