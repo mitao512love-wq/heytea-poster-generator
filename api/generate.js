@@ -1,3 +1,5 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -15,45 +17,34 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: '请选择并上传图片' });
     }
 
+    // 初始化官方 SDK
+    const genAI = new GoogleGenerativeAI(apiKey);
+    // 使用 SDK 推荐的标准模型名称
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
     const prompt = `
 Analyze the uploaded image. Design a premium, high-end HeyTea (喜茶) editorial advertising poster as a complete valid SVG string.
 
 Design Requirements:
-1. Output ONLY a valid <svg>...</svg> string.
+1. Output ONLY a valid <svg>...</svg> string, without markdown codeblock syntax or extra text.
 2. SVG dimensions: viewBox="0 0 600 800".
 3. Background: #FAF9F6 (minimal cream).
 4. Draw a simple poster layout: main item graphic in center, clean stick-figure doodles climbing on it, and clean "HEYTEA 灵感之茶" text at the bottom. Keep SVG paths clean and simple.
 `;
 
-    // 核心修改：使用具有明确版本的完整名称 gemini-1.5-flash-001
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { inlineData: { mimeType: mimeType || 'image/jpeg', data: imageBase64 } },
-                { text: prompt }
-              ]
-            }
-          ]
-        })
+    const imagePart = {
+      inlineData: {
+        data: imageBase64,
+        mimeType: mimeType || 'image/jpeg'
       }
-    );
+    };
 
-    const data = await response.json();
+    // 发送生成请求
+    const result = await model.generateContent([prompt, imagePart]);
+    const responseText = result.response.text();
 
-    if (!response.ok) {
-      console.error('Gemini API Error:', data);
-      return res.status(500).json({ error: data.error?.message || 'Gemini API 请求失败' });
-    }
-
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    
-    const svgMatch = rawText.match(/<svg[\s\S]*?<\/svg>/i);
+    // 匹配 SVG 内容
+    const svgMatch = responseText.match(/<svg[\s\S]*?<\/svg>/i);
     if (!svgMatch) {
       return res.status(500).json({ error: '海报生成格式解析失败，请重新点击生成' });
     }
