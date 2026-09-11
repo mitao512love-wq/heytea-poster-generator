@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>喜茶风灵感海报生成器 | Heytea Poster Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zhi+Mang+Xing&display=swap" rel="stylesheet">
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #faf9f6; color: #333; display: flex; flex-direction: column; align-items: center; padding: 20px; }
     .container { max-width: 500px; width: 100%; background: #fff; padding: 24px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); text-align: center; }
@@ -15,7 +18,7 @@
     button { margin-top: 16px; width: 100%; padding: 12px; background: #111; color: #fff; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 500; }
     button:disabled { background: #ccc; cursor: not-allowed; }
     .preview-box { margin-top: 24px; }
-    img { max-width: 100%; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .preview-box svg { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
     .loading { display: none; margin-top: 16px; color: #888; font-size: 0.9rem; }
   </style>
 </head>
@@ -31,58 +34,87 @@
   </div>
 
   <button id="genBtn" onclick="generatePoster()" disabled>生成喜茶风海报</button>
-  <div class="loading" id="loadingText">🎨 正在抠图与绘制手绘小人，约需 15 秒...</div>
+  <div class="loading" id="loadingText">🎨 正在绘制手绘小人，约需 15 秒...</div>
 
   <div class="preview-box" id="resultContainer" style="display: none;">
     <h3>生成效果：</h3>
-    <img id="resultImage" src="" alt="生成结果">
+    <div id="resultImage"></div>
   </div>
 </div>
 
-<script>
-  let selectedBase64 = '';
-  let selectedMime = 'image/jpeg';
+<script type="module">
+  import { removeBackground } from "https://esm.sh/@imgly/background-removal";
 
-  function handleFile(file) {
+  let selectedBase64 = '';
+  let selectedMime = 'image/png';
+
+  window.handleFile = async function(file) {
     if (!file) return;
-    document.getElementById('uploadText').innerText = `已选择: ${file.name} (压缩处理中...)`;
-    
-    // 自动压缩图片，防止超过 Vercel 限制
-    const img = new Image();
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      img.src = e.target.result;
-      img.onload = function() {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        const maxDim = 1024;
-        
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
+    const uploadText = document.getElementById('uploadText');
+    const genBtn = document.getElementById('genBtn');
+    genBtn.disabled = true;
+    uploadText.innerText = `已选择: ${file.name}（正在抠图，可能需要几秒...）`;
+
+    try {
+      // 第一步：先按最长边压缩到 1024px，加快抠图速度
+      const compressedBlob = await compressImage(file, 1024);
+
+      // 第二步：浏览器端抠图，得到带透明背景的 PNG
+      const cutoutBlob = await removeBackground(compressedBlob);
+
+      const base64 = await blobToBase64(cutoutBlob);
+      selectedBase64 = base64;
+      selectedMime = 'image/png';
+
+      uploadText.innerText = `已就绪: ${file.name}（已自动抠图）`;
+      genBtn.disabled = false;
+    } catch (err) {
+      console.error(err);
+      uploadText.innerText = '抠图失败，请换一张图片重试';
+    }
+  };
+
+  function compressImage(file, maxDim) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.src = e.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
           }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        selectedBase64 = compressedDataUrl.split(',')[1];
-        
-        document.getElementById('uploadText').innerText = `已就绪: ${file.name}`;
-        document.getElementById('genBtn').disabled = false;
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.9);
+        };
+        img.onerror = reject;
       };
-    };
-    reader.readAsDataURL(file);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
-  async function generatePoster() {
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  window.generatePoster = async function() {
     const btn = document.getElementById('genBtn');
     const loading = document.getElementById('loadingText');
     const resultBox = document.getElementById('resultContainer');
@@ -101,7 +133,8 @@
 
       const data = await res.json();
       if (res.ok && data.success) {
-        resultImg.src = data.imageUrl;
+        // 直接注入 SVG 到页面 DOM，而不是当图片显示，这样 Google 字体才能生效
+        resultImg.innerHTML = data.svgCode;
         resultBox.style.display = 'block';
       } else {
         alert('生成失败: ' + (data.error || '服务器无响应'));
@@ -112,7 +145,7 @@
       btn.disabled = false;
       loading.style.display = 'none';
     }
-  }
+  };
 </script>
 
 </body>
