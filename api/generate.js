@@ -46,7 +46,7 @@ Output ONLY a valid SVG fragment as a single <g>...</g> element (no <svg> wrappe
     const result = await model.generateContent([prompt, imagePart]);
     const responseText = result.response.text();
 
-    const overlayMatch = responseText.match(/<g[\s\S]*?<\/g>/i);
+    const overlayMatch = responseText.match(/<g[\s\S]*<\/g>/i);
     if (!overlayMatch) {
       return res.status(500).json({ error: '海报生成格式解析失败，请重新点击生成' });
     }
